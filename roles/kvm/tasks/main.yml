@@ -1,0 +1,26 @@
+---
+- name: dir for ks
+  file: name=/var/qemu/ks state=directory recurse=true
+
+- name: dir for images
+  file: name=/var/qemu/machines state=directory recurse=true
+
+- name: ansible facts dir
+  file: path=/etc/ansible/facts.d recurse=yes state=directory
+
+- name: fact for list of vm
+  template: src=vm_facts.py dest=/etc/ansible/facts.d/vm_facts.fact mode=0755
+
+- name: reload ansible_local
+  setup: filter=ansible_local
+
+- name: ks.cfg
+  template: src=ks.cfg dest=/var/qemu/ks/{{ item.name }}.cfg
+  with_items: 
+    - "{{ vm[ansible_hostname] }}"
+
+- name: check vm
+  shell: virt-install -n "{{ item.name }}" --memory "{{ item.memory }}" --vcpus "{{ item.cpu }}" --os-variant rhel7 --virt-type kvm -v -w bridge:br1 --disk path="/var/qemu/machines/{{ item.name }}".qcow2,size=20,format=qcow2  --vnc --initrd-inject="/var/qemu/ks/{{ item.name }}.cfg" --extra-args="ks=file:/{{ item.name }}.cfg" -l ~alex/ISO/CentOS-7-x86_64-DVD-1503-01.iso 
+  when: item.name not in ansible_local.vm_facts
+  with_items: 
+    - "{{ vm[ansible_hostname] }}"
